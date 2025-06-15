@@ -1,0 +1,18 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.13;
+import {FundMe} from "../src/Fundme.sol";
+import {Script, console} from "forge-std/Script.sol";
+
+contract DeployFundMe is Script {
+//     Counter public counter;
+
+//     function setUp() public {}
+
+    function run() public {
+        vm.startBroadcast();
+
+        new FundMe(0x694AA1769357215DE4FAC081bf1f309aDC325306);
+
+        vm.stopBroadcast();
+    }
+}
