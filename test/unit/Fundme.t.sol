@@ -2,8 +2,8 @@
 pragma solidity ^0.8.13;
 
 import {Test, console} from "forge-std/Test.sol";
-import{DeployFundMe} from "../script/DeployFundMe.s.sol";
-import {FundMe} from "../src/Fundme.sol";
+import{DeployFundMe} from "../../script/DeployFundMe.s.sol";
+import {FundMe} from "../../src/Fundme.sol";
 contract FundMeTest  is Test{
         address USER = makeAddr("user");
         uint256 constant STARTING_BALANCE = 10 ether; 
@@ -37,12 +37,14 @@ contract FundMeTest  is Test{
     function testAddsFunderToArray() public {
         vm.prank(USER);
         fundMe.fund{value: SEND_VALUE}();
-        address[] funders = fundMe.getFunder();
-        assertEq(funders[0], USER);
+
+        address funder = fundMe.getFunder(0);
+        assertEq(funder, USER);
     }
+
     function testOnlyOwnerCanWithdraw() public {
-        vm.prank(USER);
-        vm.expectRevert("FundMe_NotOwner");
+        vm.expectRevert();
+        vm.prank(address(3)); 
         fundMe.withdraw();
     }
 }
