@@ -2,48 +2,90 @@
 import "forge-std/Script.sol";
 import {MockV3Aggregator} from "../test/mocks/MockV3Aggregator.sol";
 pragma solidity ^0.8.13;
-contract HelperConfig  is Script{
+
+
+abstract contract CodeConstants {
+    uint8 public constant DECIMALS = 8;
+    int256 public constant INITIAL_PRICE = 2000e8;
+
+    /*//////////////////////////////////////////////////////////////
+                               CHAIN IDS
+    //////////////////////////////////////////////////////////////*/
+    uint256 public constant ETH_SEPOLIA_CHAIN_ID = 11155111;
+    uint256 public constant ZKSYNC_SEPOLIA_CHAIN_ID = 300;
+    uint256 public constant LOCAL_CHAIN_ID = 31337;
+}
+
+contract HelperConfig is CodeConstants, Script {
+    /*//////////////////////////////////////////////////////////////
+                                 ERRORS
+    //////////////////////////////////////////////////////////////*/
+    error HelperConfig__InvalidChainId();
+
+    /*//////////////////////////////////////////////////////////////
+                                 TYPES
+    //////////////////////////////////////////////////////////////*/
     struct NetworkConfig {
         address priceFeed;
     }
 
-    NetworkConfig public activeNetworkConfig;
-    uint8 public constant DECIMALS = 8;
-    int256 public constant INITIAL_PRICE = 2000e8; // 2000 USD in 8 decimals
+    /*//////////////////////////////////////////////////////////////
+                            STATE VARIABLES
+    //////////////////////////////////////////////////////////////*/
+    // Local network state variables
+    NetworkConfig public localNetworkConfig;
+    mapping(uint256 chainId => NetworkConfig) public networkConfigs;
+
+    /*//////////////////////////////////////////////////////////////
+                               FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
     constructor() {
-        if (block.chainid == 11155111) {
-            activeNetworkConfig = getSepoliaEthConfig();
-        } else if (block.chainid == 1) {
-            activeNetworkConfig = getMainnetEthConfig();
+        networkConfigs[ETH_SEPOLIA_CHAIN_ID] = getSepoliaEthConfig();
+        networkConfigs[ZKSYNC_SEPOLIA_CHAIN_ID] = getZkSyncSepoliaConfig();
+        // Note: We skip doing the local config
+    }
+
+    function getConfigByChainId(uint256 chainId) public returns (NetworkConfig memory) {
+        if (networkConfigs[chainId].priceFeed != address(0)) {
+            return networkConfigs[chainId];
+        } else if (chainId == LOCAL_CHAIN_ID) {
+            return getOrCreateAnvilEthConfig();
         } else {
-            activeNetworkConfig = getOrCreatAnvilEthConfig();
+            revert HelperConfig__InvalidChainId();
         }
     }
+
+    /*//////////////////////////////////////////////////////////////
+                                CONFIGS
+    //////////////////////////////////////////////////////////////*/
     function getSepoliaEthConfig() public pure returns (NetworkConfig memory) {
-        NetworkConfig memory sepoliaEthConfig = NetworkConfig({
-            priceFeed: 0x694AA1769357215DE4FAC081bf1f309aDC325306
-    });
-        return sepoliaEthConfig;
+        return NetworkConfig({
+            priceFeed: 0x694AA1769357215DE4FAC081bf1f309aDC325306 // ETH / USD
+        });
     }
-    function getOrCreatAnvilEthConfig() internal returns (NetworkConfig memory) {
-        if(activeNetworkConfig.priceFeed != address(0)) {
-            return activeNetworkConfig;
+
+    function getZkSyncSepoliaConfig() public pure returns (NetworkConfig memory) {
+        return NetworkConfig({
+            priceFeed: 0xfEefF7c3fB57d18C5C6Cdd71e45D2D0b4F9377bF // ETH / USD
+        });
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                              LOCAL CONFIG
+    //////////////////////////////////////////////////////////////*/
+    function getOrCreateAnvilEthConfig() public returns (NetworkConfig memory) {
+        // Check to see if we set an active network config
+        if (localNetworkConfig.priceFeed != address(0)) {
+            return localNetworkConfig;
         }
-            vm.startBroadcast();
-            MockV3Aggregator mockPriceFeed = new MockV3Aggregator(
-                DECIMALS,
-                INITIAL_PRICE
-            );
+
+        console2.log(unicode"⚠️ You have deployed a mock contract!");
+        console2.log("Make sure this was intentional");
+        vm.startBroadcast();
+        MockV3Aggregator mockPriceFeed = new MockV3Aggregator(DECIMALS, INITIAL_PRICE);
         vm.stopBroadcast();
-        NetworkConfig memory anvilEthConfig = NetworkConfig({
-            priceFeed: address(mockPriceFeed)
-        });
-        return anvilEthConfig;
-    }
-    function getMainnetEthConfig() public pure returns (NetworkConfig memory) {
-        NetworkConfig memory mainnetEthConfig = NetworkConfig({
-            priceFeed: 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419
-        });
-        return mainnetEthConfig;
+
+        localNetworkConfig = NetworkConfig({priceFeed: address(mockPriceFeed)});
+        return localNetworkConfig;
     }
 }
